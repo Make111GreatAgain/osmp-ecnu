@@ -2,7 +2,7 @@
 <template>
   <a-card title="存证溯源">
     <div v-if="route.query.taskId != null">
-      <a-button type="primary" @click="() => router.back()">< 返回合成任务列表</a-button>
+      <a-button type="primary" @click="backToTaskList">< 返回合成任务列表</a-button>
     </div>
     <a-tabs v-model:activeKey="activeKey1">
       <a-tab-pane key="1">
@@ -57,7 +57,7 @@
           </a-form-item>
           <a-space style="width: 100%; justify-content: center">
             <a-button type="primary" @click="onQuery">查询</a-button>
-            <a-button @click="resetSearchForm">重置</a-button>
+            <a-button @click="handleReset">重置</a-button>
           </a-space>
         </a-form>
       </a-tab-pane>
@@ -101,7 +101,7 @@
           </a-form-item>
           <a-space style="width: 100%; justify-content: center">
             <a-button type="primary" @click="onQuery">查询</a-button>
-            <a-button @click="resetSearchForm">重置</a-button>
+            <a-button @click="handleReset">重置</a-button>
           </a-space>
         </a-form>
       </a-tab-pane>
@@ -646,7 +646,7 @@
 </template>
 
 <script lang="ts" setup>
-  import { computed, reactive, ref, onMounted, onBeforeUnmount, nextTick } from 'vue';
+  import { computed, reactive, ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
   import {
     InfoCircleOutlined,
     LineChartOutlined,
@@ -666,6 +666,17 @@
   import { useRoute } from 'vue-router';
   import * as echarts from 'echarts';
   import { router } from '/@/router';
+  import { isWujieEnvironment, navigateWujieHost } from '/@/utils/wujie';
+  import { resetEvidencePage } from '/@/hooks/system/wujieEvidenceState';
+
+  function backToTaskList() {
+    if (isWujieEnvironment()) {
+      if (navigateWujieHost('/finDataSynthSecurity/dataSynthTask')) return;
+      void router.push('/finDataSynthSecurity/dataSynthTask');
+      return;
+    }
+    router.back();
+  }
 
   const route = useRoute();
   const infoType = ref('');
@@ -1363,6 +1374,20 @@
     EpochSearchForm.transactionType = 'EpochRecord';
   }
 
+  async function handleReset() {
+    if (!isWujieEnvironment()) {
+      resetSearchForm();
+      return;
+    }
+    const query = { ...route.query };
+    delete query.taskId;
+    await router.replace({ path: route.path, query });
+    const hostWindow = window as Window & { $wujie?: { bus: { $emit(event: string): void } } };
+    hostWindow.$wujie?.bus.$emit('finDataSynthSecurity-evidence-reset');
+    // 重建该页面，清除查询结果、弹窗和未完成请求对应的旧组件状态。
+    resetEvidencePage();
+  }
+
   const screenWidth = ref(window.innerWidth);
   // 监听窗口尺寸变化
   const updateScreenSize = () => {
@@ -1372,12 +1397,32 @@
   onMounted(() => {
     window.addEventListener('resize', updateScreenSize);
     //检查params
-    if (route.query.taskId != null) {
+    if (!isWujieEnvironment() && route.query.taskId != null) {
       TaskSearchForm.taskId = route.query.taskId;
       TaskSearchForm.queryType = 'taskId';
       onQuery();
     }
   });
+  if (isWujieEnvironment()) {
+    let loadedTaskId: string | null = null;
+    watch(
+      () => [route.path, route.query.taskId] as const,
+      ([path, taskId]) => {
+        if (path !== '/evidencePreserve' && path !== '/finDataSynthSecurity/evidencePreserve') return;
+        const value = Array.isArray(taskId) ? taskId[0] : taskId;
+        // 页签返回不重新查询，也不覆盖用户手动修改的查询条件。
+        if (value && value !== loadedTaskId) {
+          loadedTaskId = value;
+          resetSearchForm();
+          infoType.value = '';
+          activeKey1.value = '1';
+          TaskSearchForm.taskId = value;
+          void onQuery();
+        }
+      },
+      { immediate: true }
+    );
+  }
   onBeforeUnmount(() => {
     window.removeEventListener('resize', updateScreenSize);
   });

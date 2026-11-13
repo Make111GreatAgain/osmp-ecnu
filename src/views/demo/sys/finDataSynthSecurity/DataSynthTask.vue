@@ -181,7 +181,7 @@
           </a-form-item>
 
           <a-form-item label="创建人">
-            <a-input v-model:value="uploadForm.createBy" placeholder="请输入创建人（可选）" />
+            <a-input v-model:value="uploadForm.createBy" :disabled="isHostAccess" placeholder="请输入创建人（可选）" />
           </a-form-item>
         </a-form>
       </div>
@@ -197,12 +197,15 @@ import { createTaskApi, downLoadCollectApi, getSynthDataApi, uploadTaskApi } fro
 import { message } from 'ant-design-vue';
 import { useRouter } from 'vue-router';
 import { calculateDataSize } from '/@/utils/value/calDataSize';
+import { isWujieEnvironment, getHostDisplayName, navigateWujieHost } from '/@/utils/wujie';
 import ECNU_ICON from '/@/assets/ecnu.png';
 
 const router = useRouter();
 
 // 跳转并传参（query 方式）
 const evidencePage = (taskId) => {
+  const target = router.resolve({ path: '/finDataSynthSecurity/evidencePreserve', query: { taskId } });
+  if (navigateWujieHost(target.fullPath)) return;
   router.push({
     path: '/finDataSynthSecurity/evidencePreserve',
     query: { taskId: taskId },
@@ -402,6 +405,7 @@ const handleDownloadStream = async (task) => {
 };
 
 // 上传数据弹窗
+const isHostAccess = isWujieEnvironment();
 const uploadModalVisible = ref<boolean>(false);
 const uploading = ref<boolean>(false);
 const uploadForm = ref({
@@ -418,13 +422,21 @@ const handleUploadTaskStream = async (task) => {
     taskName: task.taskName || 'default',
     purpose: '',
     description: '',
-    createBy: ''
+    createBy: isHostAccess ? getHostDisplayName() : ''
   };
   uploadModalVisible.value = true;
 };
 // 确认上传
 const handleUploadConfirm = async () => {
   try {
+    // 提交时重新读取一站式平台身份
+    if (isHostAccess) {
+      uploadForm.value.createBy = getHostDisplayName();
+      if (!uploadForm.value.createBy) {
+        message.error('获取用户信息失败，请刷新页面后重试');
+        return;
+      }
+    }
     uploading.value = true;
 
     const res = await uploadTaskApi({
