@@ -2,11 +2,20 @@ import type { UserInfo } from '/#/store';
 
 type HostWindow = Window & {
   __POWERED_BY_WUJIE__?: boolean;
-  $wujie?: { props?: { userInfo?: Partial<UserInfo> | null } };
+  $wujie?: { props?: { userInfo?: Partial<UserInfo> | null; navigate?: (path: string) => void } };
 };
 
 export function isWujieEnvironment(): boolean {
   return typeof window !== 'undefined' && Boolean((window as HostWindow).__POWERED_BY_WUJIE__);
+}
+
+// 由一站式平台负责菜单、页签和地址同步；旧一站式平台未提供回调时由调用方降级。
+export function navigateWujieHost(path: string): boolean {
+  if (!isWujieEnvironment()) return false;
+  const navigate = (window as HostWindow).$wujie?.props?.navigate;
+  if (!navigate) return false;
+  navigate(path);
+  return true;
 }
 
 // 读取一站式平台用户信息

@@ -197,13 +197,15 @@ import { createTaskApi, downLoadCollectApi, getSynthDataApi, uploadTaskApi } fro
 import { message } from 'ant-design-vue';
 import { useRouter } from 'vue-router';
 import { calculateDataSize } from '/@/utils/value/calDataSize';
-import { isWujieEnvironment, getHostDisplayName } from '/@/utils/wujie';
+import { isWujieEnvironment, getHostDisplayName, navigateWujieHost } from '/@/utils/wujie';
 import ECNU_ICON from '/@/assets/ecnu.png';
 
 const router = useRouter();
 
 // 跳转并传参（query 方式）
 const evidencePage = (taskId) => {
+  const target = router.resolve({ path: '/finDataSynthSecurity/evidencePreserve', query: { taskId } });
+  if (navigateWujieHost(target.fullPath)) return;
   router.push({
     path: '/finDataSynthSecurity/evidencePreserve',
     query: { taskId: taskId },

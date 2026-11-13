@@ -1,7 +1,17 @@
 <template>
   <ConfigProvider :theme="appTheme" :locale="getAntdLocale">
     <AppProvider>
-      <RouterView />
+      <RouterView v-if="isWujieEnvironment()" v-slot="{ Component, route }">
+        <KeepAlive :key="evidenceCacheVersion" include="EvidencePreserve">
+          <component
+            :is="Component"
+            v-if="route.name === 'FinDataSynthSecurity-EvidencePreserve' && evidencePageOpen"
+            :key="route.name"
+          />
+        </KeepAlive>
+        <component :is="Component" v-if="route.name !== 'FinDataSynthSecurity-EvidencePreserve'" />
+      </RouterView>
+      <RouterView v-else />
     </AppProvider>
   </ConfigProvider>
 </template>
@@ -17,6 +27,8 @@
   import { useRootSetting } from '/@/hooks/setting/useRootSetting';
   import { ThemeEnum } from '/@/enums/appEnum';
   import { changeTheme } from '/@/logics/theme/index';
+  import { isWujieEnvironment } from '/@/utils/wujie';
+  import { evidenceCacheVersion, evidencePageOpen } from '/@/hooks/system/wujieEvidenceState';
 
   const appStore = useAppStore();
   // 解决日期时间国际化问题
